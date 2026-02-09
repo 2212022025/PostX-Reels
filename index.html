@@ -1,3 +1,5 @@
+--- START OF FILE index.html ---
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -282,7 +284,6 @@
                     posts.sort(() => Math.random() - 0.5).forEach(p => createReel(p, feed));
                     initObserver(feed);
                     
-                    // NEW: Hide splash screen once reels are rendered
                     const splash = document.getElementById('initial-splash');
                     splash.style.opacity = '0';
                     setTimeout(() => { splash.style.visibility = 'hidden'; }, 600);
@@ -353,7 +354,7 @@
                         <div class="icon-box"><i class="fas fa-comment-dots"></i></div>
                         <span class="action-text">${fmt(comCount)}</span>
                     </div>
-                    <div class="action-btn" onclick="sharePost('${post.id}', '${post.content||'Check this post'}')">
+                    <div class="action-btn" onclick="sharePost('${post.id}')">
                         <div class="icon-box"><i class="fas fa-share"></i></div>
                         <span class="action-text">Share</span>
                     </div>
@@ -443,11 +444,20 @@
         }
 
         window.copyId = function(id) { navigator.clipboard.writeText(id).then(() => alert("Post ID Copied!")); };
-        window.sharePost = async function(id, text) {
-            const url = window.location.href; 
+
+        // UPDATED SHARE FUNCTION AS REQUESTED
+        window.sharePost = async function(id) {
+            const shareUrl = "https://2212022025.github.io/PostX-Reels/" + id; 
             if (navigator.share) {
-                try { await navigator.share({ title: 'Reels Pro', text: text, url: url }); } catch (err) {}
-            } else { copyId(url); alert("Link copied!"); }
+                try { 
+                    await navigator.share({ 
+                        title: 'Reels Pro', 
+                        url: shareUrl 
+                    }); 
+                } catch (err) {}
+            } else { 
+                navigator.clipboard.writeText(shareUrl).then(() => alert("Link copied!")); 
+            }
         };
 
         window.toggleInlineMenu = function(id) {
