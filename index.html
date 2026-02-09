@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Reels Pro - Read Only</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* CSS remains unchanged as requested */
+        :root { --app-height: 100dvh; --primary: #fe2c55; --text-white: #ffffff; --text-gray: #b0b0b0; --dark-sheet: #1a1a1a; }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { background-color: #000; font-family: 'Inter', sans-serif; color: var(--text-white); overflow: hidden; height: 100%; overscroll-behavior-y: none; }
+        #app-frame { width: 100%; height: var(--app-height); background: #000; position: relative; }
+        .feed-container { height: 100%; overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none; scroll-behavior: smooth; overscroll-behavior-y: contain; }
+        .feed-container::-webkit-scrollbar { display: none; }
+        .reel-frame { height: 100%; width: 100%; scroll-snap-align: start; scroll-snap-stop: always; position: relative; background: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+        .media-wrapper { width: 100%; height: 100%; position: relative; display: flex; justify-content: center; align-items: center; }
+        .reel-media { width: 100%; height: 100%; object-fit: contain; z-index: 1; }
+        .error-container { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #777; text-align: center; width: 100%; height: 100%; z-index: 10; background: #000; position: absolute; top:0; left:0; }
+        .error-container i { font-size: 60px; margin-bottom: 15px; color: #444; }
+        .error-container span { font-weight: 600; font-size: 18px; }
+        .text-post-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background: #000; padding: 40px 20px; }
+        .text-post-box { background: #222; border: 1px solid #333; border-radius: 16px; padding: 30px 25px; color: white; font-size: 20px; font-weight: 600; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-height: 70vh; overflow-y: auto; display: block; z-index: 5; word-wrap: break-word; }
+        .type-badge { position: absolute; top: 20px; left: 20px; width: 40px; height: 40px; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(5px); border-radius: 50%; display: flex; justify-content: center; align-items: center; z-index: 20; box-shadow: 0 4px 10px rgba(0,0,0,0.3); pointer-events: none; }
+        .type-badge i { font-size: 16px; color: white; }
+        .gradient-overlay { position: absolute; bottom: 0; left: 0; width: 100%; height: 50%; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent); pointer-events: none; z-index: 2; }
+        .state-icon { position: absolute; font-size: 60px; color: rgba(255,255,255,0.8); z-index: 5; opacity: 0; transform: scale(1.5); transition: all 0.2s; pointer-events: none; }
+        .paused .state-icon { opacity: 1; transform: scale(1); }
+        .heart-pop { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0) rotate(-15deg); font-size: 100px; color: var(--primary); z-index: 50; opacity: 0; pointer-events: none; }
+        .heart-pop.animate { animation: popFadeCentered 0.8s ease-out forwards; }
+        @keyframes popFadeCentered { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0) rotate(-15deg); } 30% { opacity: 1; transform: translate(-50%, -50%) scale(1.5) rotate(0deg); } 100% { opacity: 0; transform: translate(-50%, -150%) scale(1.5) rotate(0deg); } }
+        .loader-wrapper { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 4; display: none; }
+        .dotted-loader { width: 50px; height: 50px; border: 5px dotted #ffffff; border-radius: 50%; animation: spin 5s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .progress-bar-container { width: 100%; height: 3px; background: rgba(255, 255, 255, 0.2); margin-top: 12px; border-radius: 4px; overflow: hidden; pointer-events: none; }
+        .progress-bar-fill { height: 100%; width: 0%; background: var(--primary); transition: width 0.15s linear; }
+        .actions-bar { position: absolute; right: 10px; bottom: 120px; display: flex; flex-direction: column; align-items: center; gap: 20px; z-index: 100; }
+        .action-btn { display: flex; flex-direction: column; align-items: center; cursor: pointer; position: relative; }
+        .icon-box { width: 45px; height: 45px; margin-bottom: 5px; display: flex; justify-content: center; align-items: center; transition: transform 0.1s; }
+        .action-btn:active .icon-box { transform: scale(0.9); }
+        .icon-box i { font-size: 28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+        .action-text { font-size: 12px; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+        .liked i { color: var(--primary); }
+        .inline-menu { position: absolute; right: 60px; bottom: -10px; background: #ffffff; color: #000; padding: 0; border-radius: 14px; min-width: 250px; display: none; box-shadow: 0 10px 40px rgba(0,0,0,0.4); transform-origin: bottom right; animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-align: left; z-index: 101; overflow: hidden; }
+        .inline-menu.active { display: block; }
+        .menu-header { background: #f8f8f8; padding: 10px 15px; border-bottom: 1px solid #eee; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; font-weight: 800; }
+        .inline-row { padding: 12px 15px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #f0f0f0; transition: background 0.2s; flex-wrap: nowrap; }
+        .inline-row:last-child { border-bottom: none; }
+        .inline-row i { color: #555; font-size: 14px; width: 18px; text-align: center; }
+        .inline-label { font-size: 13px; color: #777; font-weight: 500; white-space: nowrap; }
+        .inline-val { font-size: 13px; font-weight: 700; color: #000; margin-left: auto; white-space: nowrap; }
+        .inline-val-id { font-family: monospace; font-size: 11px; color: #333; margin-left: auto; padding: 4px 6px; background: #f0f0f0; border-radius: 4px; cursor: pointer; white-space: nowrap; overflow-x: auto; max-width: 140px; }
+        @keyframes popIn { from {opacity: 0; transform: scale(0.8);} to {opacity: 1; transform: scale(1);} }
+        .info-area { position: absolute; bottom: 35px; left: 15px; right: 15px; z-index: 10; text-align: left; pointer-events: none; padding-bottom: env(safe-area-inset-bottom); }
+        .user-badge { display: flex; align-items: center; margin-bottom: 10px; pointer-events: auto; cursor: pointer; }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; border: 2px solid white; margin-right: 10px; }
+        .username { font-weight: 700; font-size: 16px; text-shadow: 0 1px 2px rgba(0,0,0,0.8); display: flex; align-items: center; }
+        .caption { font-size: 14px; line-height: 1.4; color: #eee; text-shadow: 0 1px 2px rgba(0,0,0,0.8); word-wrap: break-word; }
+        .sheet-modal { position: fixed; bottom: 0; left: 0; width: 100%; height: 70%; background: var(--dark-sheet); border-radius: 16px 16px 0 0; transform: translateY(110%); transition: transform 0.3s cubic-bezier(0.1, 0.7, 0.1, 1); z-index: 1000; display: flex; flex-direction: column; box-shadow: 0 -5px 30px rgba(0,0,0,0.6); color: white; padding-bottom: env(safe-area-inset-bottom); }
+        .sheet-modal.active { transform: translateY(0); }
+        .sheet-header { padding: 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
+        .close-btn { background: none; border: none; color: white; font-size: 20px; padding: 5px; cursor: pointer; }
+        .sheet-body { flex: 1; overflow-y: auto; padding: 20px; }
+        .comment-item { display: flex; gap: 12px; margin-bottom: 18px; }
+        .c-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1px solid #333; background: #444; }
+        .c-info { display: flex; flex-direction: column; justify-content: center; }
+        .c-name { font-size: 13px; color: #ccc; font-weight: 700; margin-bottom: 3px; }
+        .c-text { font-size: 14px; color: white; line-height: 1.3; }
+        .input-bar { padding: 15px; border-top: 1px solid #333; display: flex; align-items: center; gap: 10px; background: var(--dark-sheet); }
+        .input-bar input { flex: 1; background: #333; border: none; padding: 12px 15px; border-radius: 25px; color: white; outline: none; }
+        .send-icon-btn { background: var(--primary); width: 40px; height: 40px; border-radius: 50%; display: flex; justify-content: center; align-items: center; border: none; color: white; cursor: pointer; font-size: 16px; }
+
+        /* PROFILE PAGE STYLES */
+        #profile-page { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 500; display: none; overflow-y: auto; padding-bottom: 40px; }
+        .profile-nav { padding: 15px; position: sticky; top: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); z-index: 501; display: flex; align-items: center; border-bottom: 1px solid #222; }
+        .nav-back { color: white; font-size: 20px; padding: 5px 10px 5px 0; cursor: pointer; margin-right: 15px; }
+        .nav-title { font-weight: 700; font-size: 18px; }
+        .profile-header { padding: 30px 20px; display: flex; flex-direction: column; align-items: center; }
+        .p-avatar { width: 90px; height: 90px; border-radius: 50%; border: 3px solid #222; margin-bottom: 15px; object-fit: cover; }
+        .p-name { font-size: 22px; font-weight: 700; margin-bottom: 25px; text-align: center; }
+        .stats-bar { display: flex; width: 100%; justify-content: space-around; margin-bottom: 20px; padding: 0 10px; }
+        .stat-item { display: flex; flex-direction: column; align-items: center; }
+        .stat-val { font-weight: 700; font-size: 18px; margin-bottom: 4px; }
+        .stat-lbl { font-size: 12px; color: #888; }
+        
+        .posts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; width: 100%; }
+        .grid-item { position: relative; width: 100%; padding-top: 133%; /* 3:4 Aspect Ratio */ background: #111; overflow: hidden; cursor: pointer; }
+        .grid-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+        .grid-icon { position: absolute; top: 5px; right: 5px; color: white; font-size: 12px; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+        .grid-views { position: absolute; bottom: 5px; left: 5px; color: white; font-size: 10px; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 3px; }
+
+        /* SINGLE POST VIEW */
+        #single-post-view { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 600; display: none; }
+        .single-close { position: absolute; top: 20px; right: 20px; color: white; font-size: 24px; z-index: 601; background: rgba(0,0,0,0.5); width: 40px; height: 40px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+
+        /* SPLASH SCREEN STYLES */
+        #initial-splash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            transition: opacity 0.6s ease, visibility 0.6s;
+        }
+        .splash-content {
+            text-align: center;
+        }
+        .splash-icon {
+            font-size: 60px;
+            color: var(--primary);
+            margin-bottom: 20px;
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+        .splash-text {
+            font-size: 18px;
+            font-weight: 700;
+            color: white;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- INITIAL SPLASH SCREEN -->
+    <div id="initial-splash">
+        <div class="splash-content">
+            <i class="fas fa-clapperboard splash-icon"></i>
+            <div class="splash-text">#𝚂𝚎𝚛𝚟𝚎𝚛𝙵𝚎𝚎𝚍:-𝙴𝙱𝙼𝚂-09</div>
+        </div>
+    </div>
+
+    <div id="app-frame">
+        <div class="feed-container" id="feed">
+            <div class="loader-wrapper" style="display:block">
+                <div class="dotted-loader"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PROFILE PAGE -->
+    <div id="profile-page">
+        <div class="profile-nav">
+            <i class="fas fa-arrow-left nav-back" onclick="closeProfilePage()"></i>
+            <span class="nav-title" id="p-page-name">User</span>
+        </div>
+        <div class="profile-header">
+            <img src="" class="p-avatar" id="p-page-avatar">
+            <div class="p-name" id="p-page-fullname">User</div>
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <span class="stat-val" id="p-stat-posts">0</span>
+                    <span class="stat-lbl">Posts</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-val" id="p-stat-followers">0</span>
+                    <span class="stat-lbl">Followers</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-val" id="p-stat-following">0</span>
+                    <span class="stat-lbl">Following</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-val" id="p-stat-views">0</span>
+                    <span class="stat-lbl">Views</span>
+                </div>
+            </div>
+        </div>
+        <div class="posts-grid" id="p-grid"></div>
+    </div>
+
+    <!-- SINGLE POST VIEW OVERLAY -->
+    <div id="single-post-view">
+        <div class="single-close" onclick="closeSinglePost()"><i class="fas fa-times"></i></div>
+        <div id="single-reel-container" style="width:100%; height:100%;"></div>
+    </div>
+
+    <div id="comments-sheet" class="sheet-modal">
+        <div class="sheet-header">
+            <span id="c-count">Comments</span>
+            <button class="close-btn" onclick="closeSheet()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="sheet-body" id="c-list"></div>
+        <div class="input-bar">
+            <input type="text" id="c-input" placeholder="Add a comment..." autocomplete="off">
+            <button class="send-icon-btn" id="c-send"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyA5FgwyJpsNBTpK6hU0TuJni0duOdULI5M",
+            authDomain: "advanced-pri-norw123.firebaseapp.com",
+            databaseURL: "https://advanced-pri-norw123-default-rtdb.firebaseio.com",
+            projectId: "advanced-pri-norw123",
+            storageBucket: "advanced-pri-norw123.firebasestorage.app",
+            messagingSenderId: "772396412620",
+            appId: "1:772396412620:web:9b4664b473abc075e69c69"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app); 
+        const feed = document.getElementById('feed');
+        const NORMAL_USER_ICON = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+
+        window.cachedPosts = []; 
+
+        const fmt = n => n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'k' : n;
+        
+        const timeAgo = (ts) => {
+            if (!ts) return "Recently";
+            const diff = Date.now() - ts;
+            const seconds = Math.floor(diff / 1000);
+            if (seconds < 60) return "Just now";
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return minutes + "m ago";
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return hours + "h ago";
+            const days = Math.floor(hours / 24);
+            return days + "d ago";
+        };
+
+        const getRandomColor = () => {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) { color += letters[Math.floor(Math.random() * 16)]; }
+            return color;
+        };
+
+        let audioUnlocked = false;
+        const unlockAudio = () => {
+            if(!audioUnlocked) {
+                audioUnlocked = true;
+                document.querySelectorAll('video').forEach(v => v.muted = false);
+                document.removeEventListener('click', unlockAudio);
+                document.removeEventListener('touchstart', unlockAudio);
+                feed.removeEventListener('wheel', unlockAudio);
+                feed.removeEventListener('scroll', unlockAudio);
+            }
+        };
+
+        document.addEventListener('click', unlockAudio);
+        document.addEventListener('touchstart', unlockAudio);
+        feed.addEventListener('wheel', unlockAudio, {passive: true});
+        feed.addEventListener('scroll', unlockAudio, {passive: true});
+
+        feed.addEventListener('scroll', () => {
+            document.querySelectorAll('.inline-menu.active').forEach(el => el.classList.remove('active'));
+        }, {passive: true});
+
+        window.handleMediaError = function(el) {
+            const wrapper = el.parentElement;
+            if (wrapper) {
+                wrapper.innerHTML = `<div class="error-container"><i class="fas fa-exclamation-triangle"></i><span>Post Unavailable</span></div>`;
+            }
+        };
+
+        async function init() {
+            try {
+                const snap = await get(child(ref(db), 'posts'));
+                if (snap.exists()) {
+                    feed.innerHTML = '';
+                    const data = snap.val();
+                    let posts = Object.keys(data).map(k => ({ id: k, ...data[k] }));
+                    window.cachedPosts = posts; 
+                    posts.sort(() => Math.random() - 0.5).forEach(p => createReel(p, feed));
+                    initObserver(feed);
+                    
+                    // NEW: Hide splash screen once reels are rendered
+                    const splash = document.getElementById('initial-splash');
+                    splash.style.opacity = '0';
+                    setTimeout(() => { splash.style.visibility = 'hidden'; }, 600);
+                }
+            } catch (e) { 
+                console.error(e); 
+            }
+        }
+
+        function createReel(post, container) {
+            const likes = typeof post.likes === 'object' ? Object.keys(post.likes).length : (post.likes||0);
+            const comments = post.comments || {};
+            const comCount = Object.keys(comments).length;
+            const avatar = post.user?.avatar || NORMAL_USER_ICON;
+            const name = post.user?.name || 'User';
+            const badgeColor = getRandomColor(); 
+            const authorId = post.userId || (post.user ? post.user.id : null) || 'unknown';
+            
+            const isMonetized = post.user?.isMonetized === true;
+            const blueTickHtml = isMonetized ? `<img src="https://files.catbox.moe/wjm1eg.png" style="width: 25px; height: 25px; margin-left: 5px; vertical-align: middle;">` : '';
+
+            let displayCaption = post.content || '';
+            if (displayCaption.length > 250) displayCaption = displayCaption.substring(0, 250) + "...";
+
+            const reel = document.createElement('div');
+            reel.className = 'reel-frame';
+
+            let mediaHtml = '';
+            let typeIconClass = '';
+            
+            const src = post.video || post.image;
+            const isVid = (post.image && (post.image.includes('.mp4')||post.image.includes('webm'))) || post.video;
+            const isYoutube = src && (src.includes('youtube.com') || src.includes('youtu.be'));
+
+            if (isYoutube) {
+                mediaHtml = `<div class="error-container"><i class="fas fa-exclamation-triangle"></i><span>Post Unavailable</span></div>`;
+                typeIconClass = 'fa-video-slash';
+            } else if(isVid) {
+                mediaHtml = `<video class="reel-media" loop playsinline onerror="handleMediaError(this)"><source src="${src}" type="video/mp4"></video>`;
+                typeIconClass = 'fa-video';
+            } else if (src) {
+                mediaHtml = `<img src="${src}" class="reel-media" onerror="handleMediaError(this)">`;
+                typeIconClass = 'fa-image';
+            } else {
+                typeIconClass = 'fa-align-left';
+                mediaHtml = `<div class="text-post-container"><div class="text-post-box">${post.content || "No Content"}</div></div>`;
+            }
+
+            if(post.type === 'audio') typeIconClass = 'fa-music';
+
+            reel.innerHTML = `
+                <div class="type-badge" style="border: 3px solid ${badgeColor};">
+                    <i class="fas ${typeIconClass}"></i>
+                </div>
+                <div class="media-wrapper" id="wrap-${post.id}">
+                    ${mediaHtml}
+                    <div class="loader-wrapper" id="loader-${post.id}"><div class="dotted-loader"></div></div>
+                    <div class="state-icon"><i class="fas fa-play"></i></div>
+                    <div class="heart-pop"><i class="fas fa-heart"></i></div>
+                </div>
+                <div class="gradient-overlay"></div>
+                <div class="actions-bar">
+                    <div class="action-btn" id="like-btn-${post.id}" onclick="toggleLike(this)">
+                        <div class="icon-box"><i class="fas fa-heart"></i></div>
+                        <span class="action-text">${fmt(likes)}</span>
+                    </div>
+                    <div class="action-btn" onclick="openComments('${encodeURIComponent(JSON.stringify(comments))}')">
+                        <div class="icon-box"><i class="fas fa-comment-dots"></i></div>
+                        <span class="action-text">${fmt(comCount)}</span>
+                    </div>
+                    <div class="action-btn" onclick="sharePost('${post.id}', '${post.content||'Check this post'}')">
+                        <div class="icon-box"><i class="fas fa-share"></i></div>
+                        <span class="action-text">Share</span>
+                    </div>
+                    <div class="action-btn" style="position:relative">
+                        <div class="icon-box" onclick="toggleInlineMenu('${post.id}')"><i class="fas fa-ellipsis-h"></i></div>
+                        <span class="action-text">More</span>
+                        <div class="inline-menu" id="menu-${post.id}">
+                            <div class="menu-header">Post Information</div>
+                            <div class="inline-row">
+                                <i class="fas fa-eye"></i>
+                                <span class="inline-label">Views:</span>
+                                <span class="inline-val">${post.views || 0}</span>
+                            </div>
+                            <div class="inline-row">
+                                <i class="fas fa-clock"></i>
+                                <span class="inline-label">Uploaded:</span>
+                                <span class="inline-val">${timeAgo(post.createdAt || post.timestamp || post.lastViewUpdate)}</span>
+                            </div>
+                            <div class="inline-row">
+                                <i class="fas fa-hashtag"></i>
+                                <span class="inline-label">Post ID:</span>
+                                <span class="inline-val-id" onclick="copyId('${post.id}')">${post.id}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="action-btn" onclick="window.location.href='https://uraprozx.netlify.app/'">
+                        <div class="icon-box"><i class="fas fa-plus-circle"></i></div>
+                        <span class="action-text">Add</span>
+                    </div>
+                </div>
+                <div class="info-area">
+                    <div class="user-badge" onclick="openUserProfile('${authorId}')">
+                        <img src="${avatar}" class="avatar">
+                        <div class="username">${name}${blueTickHtml}</div>
+                    </div>
+                    ${!src && !isVid ? '' : `<div class="caption">${displayCaption}</div>`}
+                    ${(isVid && !isYoutube) ? `<div class="progress-bar-container"><div class="progress-bar-fill" id="progress-fill-${post.id}"></div></div>` : ''}
+                </div>
+            `;
+            container.appendChild(reel);
+
+            if(isVid && !isYoutube) {
+                const vidEl = reel.querySelector('video');
+                const loader = reel.querySelector(`#loader-${post.id}`);
+                const progressFill = reel.querySelector(`#progress-fill-${post.id}`);
+                vidEl.addEventListener('waiting', () => { if(loader) loader.style.display = 'block'; });
+                vidEl.addEventListener('playing', () => { if(loader) loader.style.display = 'none'; });
+                vidEl.addEventListener('canplay', () => { if(loader) loader.style.display = 'none'; });
+                vidEl.addEventListener('timeupdate', () => {
+                    if (vidEl.duration && progressFill) {
+                        const pct = (vidEl.currentTime / vidEl.duration) * 100;
+                        progressFill.style.width = pct + '%';
+                    }
+                });
+            } else {
+                const loader = reel.querySelector(`#loader-${post.id}`);
+                if(loader) loader.style.display = 'none';
+            }
+
+            const wrapper = reel.querySelector(`#wrap-${post.id}`);
+            const video = wrapper.querySelector('video');
+            const heartPop = wrapper.querySelector('.heart-pop');
+            const likeBtn = reel.querySelector(`#like-btn-${post.id}`);
+            let lastTapTime = 0;
+            let tapTimeout;
+
+            wrapper.addEventListener('click', (e) => {
+                if(e.target.closest('.actions-bar') || e.target.closest('.error-container')) return;
+                const now = new Date().getTime();
+                const timeDiff = now - lastTapTime;
+                if (timeDiff < 300 && timeDiff > 0) {
+                    clearTimeout(tapTimeout);
+                    heartPop.classList.remove('animate');
+                    void heartPop.offsetWidth; 
+                    heartPop.classList.add('animate');
+                    if (!likeBtn.classList.contains('liked')) toggleLike(likeBtn);
+                } else {
+                    tapTimeout = setTimeout(() => {
+                        if (video) {
+                            if (video.paused) { video.play(); wrapper.classList.remove('paused'); }
+                            else { video.pause(); wrapper.classList.add('paused'); }
+                        }
+                    }, 300);
+                }
+                lastTapTime = now;
+            });
+        }
+
+        window.copyId = function(id) { navigator.clipboard.writeText(id).then(() => alert("Post ID Copied!")); };
+        window.sharePost = async function(id, text) {
+            const url = window.location.href; 
+            if (navigator.share) {
+                try { await navigator.share({ title: 'Reels Pro', text: text, url: url }); } catch (err) {}
+            } else { copyId(url); alert("Link copied!"); }
+        };
+
+        window.toggleInlineMenu = function(id) {
+            const menu = document.getElementById(`menu-${id}`);
+            document.querySelectorAll('.inline-menu').forEach(el => { if(el !== menu) el.classList.remove('active'); });
+            menu.classList.toggle('active');
+        };
+
+        function initObserver(targetContainer) {
+            const obs = new IntersectionObserver(entries => {
+                entries.forEach(e => {
+                    const vid = e.target.querySelector('video');
+                    if(!vid) return;
+                    if(e.isIntersecting) {
+                        vid.muted = !audioUnlocked;
+                        vid.play().catch(() => { vid.muted = true; vid.play(); });
+                        const wrapper = e.target.querySelector('.media-wrapper');
+                        if(wrapper) wrapper.classList.remove('paused');
+                    } else { vid.pause(); vid.currentTime = 0; }
+                });
+            }, {threshold: 0.6, root: targetContainer === feed ? null : targetContainer.parentElement}); 
+            targetContainer.querySelectorAll('.reel-frame').forEach(el => obs.observe(el));
+        }
+
+        window.toggleLike = function(btn) {
+            const i = btn.querySelector('i');
+            btn.classList.toggle('liked');
+            if(btn.classList.contains('liked')) {
+                i.style.transform = 'scale(1.4)';
+                setTimeout(()=>i.style.transform='scale(1)', 200);
+            }
+        };
+
+        const cSheet = document.getElementById('comments-sheet');
+        const cList = document.getElementById('c-list');
+        const cInput = document.getElementById('c-input');
+        
+        function hideCommentsUI() {
+            cSheet.classList.remove('active');
+        }
+
+        function hideSinglePostUI() {
+            const singleView = document.getElementById('single-post-view');
+            const singleContainer = document.getElementById('single-reel-container');
+            singleView.style.display = 'none';
+            singleContainer.innerHTML = '';
+            const vids = singleContainer.querySelectorAll('video');
+            vids.forEach(v => { v.pause(); v.src = ""; });
+        }
+
+        function hideProfileUI() {
+            const profilePage = document.getElementById('profile-page');
+            const appFrame = document.getElementById('app-frame');
+            profilePage.style.display = 'none';
+            appFrame.style.display = 'block';
+        }
+
+        window.addEventListener('popstate', (event) => {
+            if (cSheet.classList.contains('active')) {
+                hideCommentsUI();
+            } else if (document.getElementById('single-post-view').style.display === 'block') {
+                hideSinglePostUI();
+            } else if (document.getElementById('profile-page').style.display === 'block') {
+                hideProfileUI();
+            }
+        });
+
+        window.openComments = function(str) {
+            history.pushState({modal: 'comments'}, '', '');
+            const data = JSON.parse(decodeURIComponent(str));
+            document.getElementById('c-count').innerText = Object.keys(data).length + ' Comments';
+            cList.innerHTML = '';
+            if(Object.keys(data).length) {
+                Object.values(data).forEach(c => {
+                    const uName = c.user?.name || c.user || 'Guest';
+                    addCom(uName, c.text||c.content, NORMAL_USER_ICON);
+                });
+            } else { cList.innerHTML = '<div style="text-align:center;color:#777;margin-top:20px">No comments yet</div>'; }
+            cSheet.classList.add('active');
+        };
+
+        window.closeSheet = function() { 
+            history.back(); 
+        };
+
+        document.getElementById('c-send').addEventListener('click', () => {
+            const txt = cInput.value.trim();
+            if(!txt) return;
+            if(cList.innerText.includes('No comments')) cList.innerHTML = '';
+            addCom('You', txt, NORMAL_USER_ICON);
+            cInput.value = '';
+            cList.scrollTop = cList.scrollHeight;
+        });
+
+        function addCom(n, t, img) {
+            const d = document.createElement('div');
+            d.className = 'comment-item';
+            d.innerHTML = `<img src="${img}" class="c-avatar"><div class="c-info"><div class="c-name">${n}</div><div class="c-text">${t}</div></div>`;
+            cList.appendChild(d);
+        }
+
+        const profilePage = document.getElementById('profile-page');
+        const appFrame = document.getElementById('app-frame');
+        const pGrid = document.getElementById('p-grid');
+
+        window.openUserProfile = async function(uid) {
+            history.pushState({modal: 'profile'}, '', '');
+            appFrame.style.display = 'none';
+            profilePage.style.display = 'block';
+            document.getElementById('p-page-name').innerText = 'Loading...';
+            document.getElementById('p-page-fullname').innerText = '';
+            document.getElementById('p-page-avatar').src = NORMAL_USER_ICON;
+            document.getElementById('p-stat-posts').innerText = '0';
+            document.getElementById('p-stat-followers').innerText = '0';
+            document.getElementById('p-stat-following').innerText = '0';
+            document.getElementById('p-stat-views').innerText = '0';
+            pGrid.innerHTML = '';
+            if(!uid || uid === 'unknown') return;
+            const userPosts = window.cachedPosts.filter(p => {
+                const pid = p.userId || (p.user ? p.user.id : null);
+                return pid === uid;
+            });
+            document.getElementById('p-stat-posts').innerText = fmt(userPosts.length);
+            try {
+                const snapshot = await get(child(ref(db), `users/${uid}`));
+                if (snapshot.exists()) {
+                    const user = snapshot.val();
+                    document.getElementById('p-page-name').innerText = user.name || "User";
+                    document.getElementById('p-page-fullname').innerText = user.name || "User";
+                    document.getElementById('p-page-avatar').src = user.avatar || NORMAL_USER_ICON;
+                    const f = user.followers ? Object.keys(user.followers).length : 0;
+                    const fing = user.following ? Object.keys(user.following).length : 0;
+                    document.getElementById('p-stat-followers').innerText = fmt(f);
+                    document.getElementById('p-stat-following').innerText = fmt(fing);
+                    document.getElementById('p-stat-views').innerText = fmt(user.totalViews || 0);
+                }
+            } catch(e) { console.error(e); }
+            userPosts.forEach(post => {
+                const item = document.createElement('div');
+                item.className = 'grid-item';
+                let thumbContent = '';
+                let iconClass = '';
+                const src = post.video || post.image;
+                const isVid = (post.image && (post.image.includes('.mp4')||post.image.includes('webm'))) || post.video;
+                if (isVid) {
+                    thumbContent = `<video src="${src}" class="grid-img" style="object-fit:cover" muted preload="metadata"></video>`;
+                    iconClass = 'fa-play';
+                } else if (src) {
+                    thumbContent = `<img src="${src}" class="grid-img">`;
+                    iconClass = 'fa-clone';
+                } else {
+                    thumbContent = `<div style="width:100%;height:100%;background:#222;display:flex;align-items:center;justify-content:center;color:#555;font-size:10px;padding:5px;text-align:center;">${(post.content||'').substring(0,20)}...</div>`;
+                    iconClass = 'fa-align-left';
+                }
+                item.innerHTML = `
+                    ${thumbContent}
+                    <div class="grid-icon"><i class="fas ${iconClass}"></i></div>
+                    <div class="grid-views"><i class="fas fa-play" style="font-size:8px"></i> ${fmt(post.views || 0)}</div>
+                `;
+                item.onclick = () => openSinglePost(post);
+                pGrid.appendChild(item);
+            });
+        };
+
+        window.closeProfilePage = function() {
+            history.back();
+        };
+
+        const singleView = document.getElementById('single-post-view');
+        const singleContainer = document.getElementById('single-reel-container');
+
+        window.openSinglePost = function(post) {
+            history.pushState({modal: 'single'}, '', '');
+            singleContainer.innerHTML = '';
+            createReel(post, singleContainer);
+            singleView.style.display = 'block';
+            const video = singleContainer.querySelector('video');
+            if(video) {
+                audioUnlocked = true; 
+                video.muted = false;
+                video.currentTime = 0;
+                video.play().catch(e => console.log('Autoplay blocked:', e));
+                const wrapper = singleContainer.querySelector('.media-wrapper');
+                if(wrapper) wrapper.classList.remove('paused');
+            }
+            initObserver(singleContainer); 
+        };
+
+        window.closeSinglePost = function() {
+            history.back();
+        };
+
+        init();
+    </script>
+</body>
+</html>
